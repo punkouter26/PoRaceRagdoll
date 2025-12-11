@@ -1,0 +1,18 @@
+C4Container
+    title Container Diagram for PoRaceRagdoll
+
+    Person(player, "Player", "A user playing the betting game")
+
+    Container_Boundary(c1, "PoRaceRagdoll App") {
+        Container(spa, "Single Page App", "React, Vite", "Provides the game interface and logic")
+        Container(store, "Game Store", "Zustand", "Manages game state, balance, and race logic")
+        Container(engine, "3D Engine", "BabylonJS", "Renders the 3D scene and handles input")
+        Container(physics, "Physics Engine", "Havok", "Simulates ragdoll physics and collisions")
+        Container(audio, "Audio Manager", "Web Audio API", "Handles sound effects")
+    }
+
+    Rel(player, spa, "Interacts with")
+    Rel(spa, store, "Reads/Writes state")
+    Rel(spa, engine, "Renders scene")
+    Rel(engine, physics, "Simulates physics")
+    Rel(spa, audio, "Plays sounds")
