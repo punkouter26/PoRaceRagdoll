@@ -4,13 +4,13 @@ name: Deploy Next.js to Azure Static Web Apps
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - 'src/poraceragdoll-web/**'
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches:
-      - main
+      - master
     paths:
       - 'src/poraceragdoll-web/**'
   workflow_dispatch:

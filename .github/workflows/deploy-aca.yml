@@ -7,7 +7,7 @@ name: Build and Deploy to Azure Container Apps
 on:
   push:
     branches:
-      - main
+      - master
   workflow_dispatch:
 
 permissions:
