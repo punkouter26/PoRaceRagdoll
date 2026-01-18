@@ -1,0 +1,28 @@
+# Azure Developer CLI (azd) Configuration
+# https://learn.microsoft.com/azure/developer/azure-developer-cli/
+name: PoRaceRagdoll
+
+metadata:
+  template: PoRaceRagdoll@1.0.0
+
+infra:
+  provider: bicep
+  path: infra
+  module: main
+
+services:
+  api:
+    project: src/PoRaceRagdoll.Api
+    language: dotnet
+    host: containerapp
+    docker:
+      path: src/PoRaceRagdoll.Api/Dockerfile
+      context: .
+
+hooks:
+  postprovision:
+    shell: sh
+    run: |
+      echo "Infrastructure provisioned successfully!"
+      echo "Resource Group: PoRaceRagdoll"
+      echo "Container App FQDN: ${AZURE_CONTAINER_APP_FQDN}"

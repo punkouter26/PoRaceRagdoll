@@ -1,0 +1,42 @@
+@baseUrl = http://localhost:5000
+@sessionId = {{createSession.response.body.sessionId}}
+
+### Health Check
+GET {{baseUrl}}/health
+
+### Health Check - Live
+GET {{baseUrl}}/health/live
+
+### Health Check - Ready
+GET {{baseUrl}}/health/ready
+
+### Get Available Species
+GET {{baseUrl}}/api/game/species
+
+### Create New Session
+# @name createSession
+POST {{baseUrl}}/api/game/session
+Content-Type: application/json
+
+### Get Session State
+GET {{baseUrl}}/api/game/session/{{sessionId}}
+
+### Place Bet on Racer 0
+POST {{baseUrl}}/api/game/session/{{sessionId}}/bet
+Content-Type: application/json
+
+{
+    "racerId": 0
+}
+
+### Finish Race (Racer 0 wins)
+POST {{baseUrl}}/api/game/session/{{sessionId}}/finish
+Content-Type: application/json
+
+{
+    "winnerId": 0
+}
+
+### Next Round
+POST {{baseUrl}}/api/game/session/{{sessionId}}/next
+Content-Type: application/json

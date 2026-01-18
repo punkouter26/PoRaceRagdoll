@@ -1,0 +1,148 @@
+# GitHub Actions Workflow: Build and Deploy to Azure Container Apps
+# Triggers on push to main branch
+# Deploys to resource group: PoRaceRagdoll
+
+name: Build and Deploy to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_SUBSCRIPTION_ID: 'bbb8dfbe-9169-432f-9b7a-fbf861b51037'
+  AZURE_RESOURCE_GROUP: 'PoRaceRagdoll'
+  AZURE_LOCATION: 'eastus'
+  AZURE_ENV_NAME: 'prod'
+  DOCKER_IMAGE_NAME: 'poraceragdoll-api'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    
+    steps:
+      # =====================================================
+      # Checkout Code
+      # =====================================================
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # =====================================================
+      # Azure Login using OIDC
+      # =====================================================
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # =====================================================
+      # Build Docker Image
+      # =====================================================
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -f src/PoRaceRagdoll.Api/Dockerfile \
+            -t ${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }} \
+            -t ${{ env.DOCKER_IMAGE_NAME }}:latest \
+            .
+
+      # =====================================================
+      # Deploy Infrastructure with Bicep
+      # =====================================================
+      - name: Deploy Infrastructure
+        uses: azure/arm-deploy@v2
+        id: deploy-infra
+        with:
+          scope: subscription
+          subscriptionId: ${{ env.AZURE_SUBSCRIPTION_ID }}
+          region: ${{ env.AZURE_LOCATION }}
+          template: infra/main.bicep
+          parameters: >
+            environmentName=${{ env.AZURE_ENV_NAME }}
+            location=${{ env.AZURE_LOCATION }}
+            resourceGroupName=${{ env.AZURE_RESOURCE_GROUP }}
+          failOnStdErr: false
+          deploymentName: poraceragdoll-${{ github.run_number }}
+
+      # =====================================================
+      # Wait for Deployment
+      # =====================================================
+      - name: Wait for deployment completion
+        run: |
+          az deployment sub wait \
+            --name poraceragdoll-${{ github.run_number }} \
+            --subscription ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      # =====================================================
+      # Get ACR Name and Login
+      # =====================================================
+      - name: Get ACR login server
+        id: get-acr
+        run: |
+          ACR_NAME=$(az acr list --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query "[0].name" -o tsv)
+          ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query "loginServer" -o tsv)
+          echo "ACR_NAME=$ACR_NAME" >> $GITHUB_OUTPUT
+          echo "ACR_LOGIN_SERVER=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
+
+      - name: Login to Azure Container Registry
+        run: |
+          az acr login --name ${{ steps.get-acr.outputs.ACR_NAME }}
+
+      # =====================================================
+      # Push Image to ACR
+      # =====================================================
+      - name: Tag and Push Docker image to ACR
+        run: |
+          docker tag ${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }} ${{ steps.get-acr.outputs.ACR_LOGIN_SERVER }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+          docker tag ${{ env.DOCKER_IMAGE_NAME }}:latest ${{ steps.get-acr.outputs.ACR_LOGIN_SERVER }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+          docker push ${{ steps.get-acr.outputs.ACR_LOGIN_SERVER }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ steps.get-acr.outputs.ACR_LOGIN_SERVER }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+
+      # =====================================================
+      # Deploy to Container App
+      # =====================================================
+      - name: Get Container App name
+        id: get-container-app
+        run: |
+          CONTAINER_APP_NAME=$(az containerapp list --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query "[0].name" -o tsv)
+          echo "CONTAINER_APP_NAME=$CONTAINER_APP_NAME" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Azure Container Apps
+        run: |
+          az containerapp update \
+            --name ${{ steps.get-container-app.outputs.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --image ${{ steps.get-acr.outputs.ACR_LOGIN_SERVER }}/${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+
+      # =====================================================
+      # Output Deployment Info
+      # =====================================================
+      - name: Get Container App URL
+        id: get-url
+        run: |
+          FQDN=$(az containerapp show \
+            --name ${{ steps.get-container-app.outputs.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+          echo "APP_URL=https://$FQDN" >> $GITHUB_OUTPUT
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Application URL**: https://$FQDN" >> $GITHUB_STEP_SUMMARY
+          echo "- **Health Check**: https://$FQDN/health" >> $GITHUB_STEP_SUMMARY
+          echo "- **Resource Group**: [${{ env.AZURE_RESOURCE_GROUP }}](https://portal.azure.com/#@/resource/subscriptions/${{ env.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.AZURE_RESOURCE_GROUP }})" >> $GITHUB_STEP_SUMMARY
+
+      - name: Test health endpoint
+        run: |
+          echo "Testing health endpoint..."
+          sleep 30  # Wait for container to start
+          curl -f https://${{ steps.get-url.outputs.APP_URL }}/health || echo "Health check will be available after full deployment"

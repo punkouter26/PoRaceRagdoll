@@ -1,0 +1,27 @@
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+
+# Node modules
+**/node_modules/
+
+# Next.js build
+**/.next/
+
+# IDE
+.vs/
+.vscode/
+*.user
+
+# Test results
+**/TestResults/
+
+# Coverage
+**/coverage/
+
+# Packages
+*.nupkg
+
+# Logs
+*.log
