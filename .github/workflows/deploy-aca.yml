@@ -76,15 +76,6 @@ jobs:
           deploymentName: poraceragdoll-${{ github.run_number }}
 
       # =====================================================
-      # Wait for Deployment
-      # =====================================================
-      - name: Wait for deployment completion
-        run: |
-          az deployment sub wait \
-            --name poraceragdoll-${{ github.run_number }} \
-            --subscription ${{ env.AZURE_SUBSCRIPTION_ID }}
-
-      # =====================================================
       # Get ACR Name and Login
       # =====================================================
       - name: Get ACR login server
