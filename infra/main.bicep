@@ -1,57 +1,92 @@
-// PoRaceRagdoll Infrastructure - Azure Container Apps Deployment
+// PoRaceRagdoll Infrastructure - Uses Shared Resources from PoShared
 // Resource Group: PoRaceRagdoll
-// Subscription: Punkouter26 (Bbb8dfbe-9169-432f-9b7a-fbf861b51037)
+// Shared Resources: acrposhared, cae-poshared, mi-poshared-apps (from PoShared)
 
-targetScope = 'subscription'
+targetScope = 'resourceGroup'
 
 // =====================================================
 // Parameters
 // =====================================================
 
-@description('The environment name (used for resource naming)')
-param environmentName string
+@description('Container image to deploy')
+param containerImage string = 'acrposhared.azurecr.io/poraceragdoll-api:latest'
 
 @description('Primary location for resources')
-param location string = 'eastus'
-
-@description('Resource group name')
-param resourceGroupName string = 'PoRaceRagdoll'
+param location string = resourceGroup().location
 
 // =====================================================
-// Variables
+// Existing Shared Resources (from PoShared)
 // =====================================================
 
-var resourceToken = uniqueString(subscription().id, location, environmentName)
-var tags = {
-  'azd-env-name': environmentName
-  project: 'PoRaceRagdoll'
+resource sharedEnvironment 'Microsoft.App/managedEnvironments@2025-01-01' existing = {
+  name: 'cae-poshared'
+  scope: resourceGroup('PoShared')
+}
+
+resource sharedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  name: 'mi-poshared-apps'
+  scope: resourceGroup('PoShared')
 }
 
 // =====================================================
-// Resource Group
+// Container App - API
 // =====================================================
 
-resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
-  name: resourceGroupName
+resource containerApp 'Microsoft.App/containerApps@2025-01-01' = {
+  name: 'poraceragdoll-api'
   location: location
   tags: {
-    'azd-env-name': environmentName
     project: 'PoRaceRagdoll'
+    'azd-service-name': 'api'
   }
-}
-
-// =====================================================
-// Module: Core Infrastructure
-// =====================================================
-
-module infrastructure 'modules/infrastructure.bicep' = {
-  name: 'infrastructure-${resourceToken}'
-  scope: rg
-  params: {
-    environmentName: environmentName
-    location: location
-    resourceToken: resourceToken
-    tags: tags
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${sharedIdentity.id}': {}
+    }
+  }
+  properties: {
+    managedEnvironmentId: sharedEnvironment.id
+    configuration: {
+      ingress: {
+        external: true
+        targetPort: 8080
+        allowInsecure: false
+        transport: 'auto'
+      }
+      registries: [
+        {
+          server: 'acrposhared.azurecr.io'
+          identity: sharedIdentity.id
+        }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: 'poraceragdoll-api'
+          image: containerImage
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+          env: [
+            {
+              name: 'ASPNETCORE_ENVIRONMENT'
+              value: 'Production'
+            }
+            {
+              name: 'ASPNETCORE_URLS'
+              value: 'http://+:8080'
+            }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 3
+      }
+    }
   }
 }
 
@@ -59,11 +94,5 @@ module infrastructure 'modules/infrastructure.bicep' = {
 // Outputs
 // =====================================================
 
-output RESOURCE_GROUP_ID string = rg.id
-output AZURE_CONTAINER_REGISTRY_ENDPOINT string = infrastructure.outputs.containerRegistryLoginServer
-output AZURE_CONTAINER_REGISTRY_NAME string = infrastructure.outputs.containerRegistryName
-output AZURE_CONTAINER_APP_ENVIRONMENT_ID string = infrastructure.outputs.containerAppEnvironmentId
-output AZURE_CONTAINER_APP_NAME string = infrastructure.outputs.containerAppName
-output AZURE_CONTAINER_APP_FQDN string = infrastructure.outputs.containerAppFqdn
-output MANAGED_IDENTITY_ID string = infrastructure.outputs.managedIdentityId
-output MANAGED_IDENTITY_CLIENT_ID string = infrastructure.outputs.managedIdentityClientId
+output containerAppName string = containerApp.name
+output containerAppFqdn string = containerApp.properties.configuration.ingress.fqdn

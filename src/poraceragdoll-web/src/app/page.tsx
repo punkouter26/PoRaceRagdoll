@@ -14,7 +14,14 @@ const RaceCanvas = dynamic(() => import('@/components/RaceCanvas'), {
 
 export default function Home() {
   const gameState = useGameStore(state => state.state);
+  const hydrate = useGameStore(state => state.hydrate);
+  const isHydrated = useGameStore(state => state.isHydrated);
   const [transitioning, setTransitioning] = useState(false);
+
+  // Hydrate the store with random data only on client
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     if (gameState === 'RACING') {
@@ -23,6 +30,15 @@ export default function Home() {
       return () => clearTimeout(timer);
     }
   }, [gameState]);
+
+  // Show loading until hydrated
+  if (!isHydrated) {
+    return (
+      <div className="relative w-screen h-screen overflow-hidden bg-black flex items-center justify-center">
+        <span className="text-white text-xl">Loading...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">

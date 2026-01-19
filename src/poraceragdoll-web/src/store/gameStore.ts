@@ -51,6 +51,7 @@ interface GameStore extends GameState {
     isOnline: boolean;
     isLoading: boolean;
     error: string | null;
+    isHydrated: boolean;
     
     // Actions
     initSession: () => Promise<void>;
@@ -59,16 +60,17 @@ interface GameStore extends GameState {
     finishRace: (winnerId: number) => Promise<void>;
     nextRound: () => Promise<void>;
     setOnlineMode: (online: boolean) => void;
+    hydrate: () => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
-    // Initial state
+    // Initial state - use empty racers to avoid hydration mismatch
     sessionId: null,
     balance: INITIAL_BALANCE,
     round: 1,
     maxRounds: TOTAL_ROUNDS,
     state: 'BETTING',
-    racers: generateRacers(),
+    racers: [],
     selectedRacerId: null,
     betAmount: INITIAL_BET,
     winnerId: null,
@@ -76,6 +78,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     isOnline: false, // Start in offline mode for faster dev
     isLoading: false,
     error: null,
+    isHydrated: false,
+    
+    hydrate: () => {
+        const { isHydrated } = get();
+        if (!isHydrated) {
+            set({ racers: generateRacers(), isHydrated: true });
+        }
+    },
 
     initSession: async () => {
         const { isOnline } = get();

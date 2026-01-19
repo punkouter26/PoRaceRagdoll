@@ -6,7 +6,6 @@ using System.Reflection;
 namespace PoRaceRagdoll.Api.Controllers;
 
 [ApiController]
-[Route("[controller]")]
 public class HealthController : ControllerBase
 {
     private readonly HealthCheckService _healthCheckService;
@@ -17,9 +16,30 @@ public class HealthController : ControllerBase
     }
 
     /// <summary>
+    /// Root endpoint - API info
+    /// </summary>
+    [HttpGet("/")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public IActionResult GetRoot()
+    {
+        var version = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion ?? "1.0.0";
+
+        return Ok(new
+        {
+            name = "PoRaceRagdoll API",
+            version,
+            status = "running",
+            health = "/health",
+            docs = "/swagger"
+        });
+    }
+
+    /// <summary>
     /// Health check endpoint that validates all dependencies
     /// </summary>
-    [HttpGet]
+    [HttpGet("/health")]
     [ProducesResponseType(typeof(HealthStatusResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(HealthStatusResponse), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> GetHealth()

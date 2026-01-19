@@ -2,26 +2,43 @@
 **/bin/
 **/obj/
 **/out/
+**/publish/
+**/dist/
+**/.output/
 
 # Node modules
 **/node_modules/
 
 # Next.js build
 **/.next/
+**/.turbo/
 
 # IDE
 .vs/
-.vscode/
 *.user
 
 # Test results
 **/TestResults/
+**/test-results/
+**/playwright-report/
 
 # Coverage
 **/coverage/
 
 # Packages
 *.nupkg
+**/package-lock.json
 
 # Logs
 *.log
+
+# Azure
+.azure/
+azd-env/
+
+# Agent
+.agent/
+
+# Lock files
+**/pnpm-lock.yaml
+**/yarn.lock

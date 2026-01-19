@@ -9,6 +9,7 @@ obj/
 *.DotSettings.user
 TestResults/
 *.nupkg
+publish/
 
 # Node.js
 node_modules/
@@ -17,16 +18,19 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.pnpm-store/
 
 # Next.js
 .next/
 out/
 .vercel
+.turbo/
 
 # Build
 dist/
 dist-ssr/
 build/
+.output/
 
 # IDE
 .idea/
@@ -34,6 +38,8 @@ build/
 *.swo
 .vscode/*
 !.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
 
 # Environment
 *.local
@@ -68,3 +74,10 @@ logs/
 test-results/
 playwright-report/
 playwright/.cache/
+
+# Azure
+.azure/
+azd-env/
+
+# Agent
+.agent/

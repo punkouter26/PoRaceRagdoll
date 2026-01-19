@@ -166,4 +166,94 @@ public class GameSessionServiceTests
         state.SelectedRacerId.Should().Be(0);
         state.Balance.Should().Be(GameConfig.InitialBalance - GameConfig.InitialBet);
     }
+
+    [Fact]
+    public void PlaceBet_WithInvalidRacerId_ShouldNotChangeState()
+    {
+        // Arrange
+        var sessionId = _sut.CreateSession();
+
+        // Act
+        var state = _sut.PlaceBet(sessionId, 99);
+
+        // Assert
+        state.Should().NotBeNull();
+        state!.State.Should().Be("BETTING");
+    }
+
+    [Fact]
+    public void PlaceBet_WhenNotBetting_ShouldNotChangeState()
+    {
+        // Arrange
+        var sessionId = _sut.CreateSession();
+        _sut.PlaceBet(sessionId, 0); // Transition to RACING
+
+        // Act
+        var state = _sut.PlaceBet(sessionId, 1); // Try to bet again
+
+        // Assert
+        state.Should().NotBeNull();
+        state!.State.Should().Be("RACING");
+        state.SelectedRacerId.Should().Be(0); // Original selection unchanged
+    }
+
+    [Fact]
+    public void FinishRace_WhenPlayerWins_ShouldIncreasBalance()
+    {
+        // Arrange
+        _oddsServiceMock.Setup(o => o.CalculatePayout(It.IsAny<int>(), It.IsAny<int>(), true))
+            .Returns(200);
+        
+        var sessionId = _sut.CreateSession();
+        var stateAfterBet = _sut.PlaceBet(sessionId, 0);
+        var balanceAfterBet = stateAfterBet!.Balance;
+
+        // Act
+        var (state, result) = _sut.FinishRace(sessionId, 0); // Same racer wins
+
+        // Assert
+        state.Should().NotBeNull();
+        state!.State.Should().Be("FINISHED");
+        result.Should().NotBeNull();
+        result!.PlayerWon.Should().BeTrue();
+    }
+
+    [Fact]
+    public void FinishRace_WhenPlayerLoses_ShouldNotChangeBalance()
+    {
+        // Arrange
+        var sessionId = _sut.CreateSession();
+        _sut.PlaceBet(sessionId, 0);
+        var stateAfterBet = _sut.GetSession(sessionId);
+        var balanceAfterBet = stateAfterBet!.Balance;
+
+        // Act
+        var (state, result) = _sut.FinishRace(sessionId, 5); // Different racer wins
+
+        // Assert
+        state.Should().NotBeNull();
+        state!.State.Should().Be("FINISHED");
+        state.Balance.Should().Be(balanceAfterBet); // No change
+        result.Should().NotBeNull();
+        result!.PlayerWon.Should().BeFalse();
+    }
+
+    [Fact]
+    public void NextRound_ShouldResetStateForNewRound()
+    {
+        // Arrange
+        var sessionId = _sut.CreateSession();
+        _sut.PlaceBet(sessionId, 0);
+        _sut.FinishRace(sessionId, 0);
+
+        // Act
+        var state = _sut.NextRound(sessionId);
+
+        // Assert
+        state.Should().NotBeNull();
+        state!.State.Should().Be("BETTING");
+        state.Round.Should().Be(2);
+        state.SelectedRacerId.Should().BeNull();
+        state.WinnerId.Should().BeNull();
+    }
 }

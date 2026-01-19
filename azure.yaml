@@ -1,5 +1,6 @@
 # Azure Developer CLI (azd) Configuration
 # https://learn.microsoft.com/azure/developer/azure-developer-cli/
+# Uses shared resources from PoShared (ACR, Container App Environment, Managed Identity)
 name: PoRaceRagdoll
 
 metadata:
@@ -18,11 +19,3 @@ services:
     docker:
       path: src/PoRaceRagdoll.Api/Dockerfile
       context: .
-
-hooks:
-  postprovision:
-    shell: sh
-    run: |
-      echo "Infrastructure provisioned successfully!"
-      echo "Resource Group: PoRaceRagdoll"
-      echo "Container App FQDN: ${AZURE_CONTAINER_APP_FQDN}"

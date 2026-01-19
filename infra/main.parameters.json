@@ -2,14 +2,11 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "environmentName": {
-      "value": "${AZURE_ENV_NAME}"
+    "containerImage": {
+      "value": "acrposhared.azurecr.io/poraceragdoll-api:latest"
     },
     "location": {
-      "value": "${AZURE_LOCATION}"
-    },
-    "resourceGroupName": {
-      "value": "PoRaceRagdoll"
+      "value": "eastus"
     }
   }
 }
