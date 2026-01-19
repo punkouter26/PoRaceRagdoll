@@ -25,9 +25,11 @@ export default function RaceCanvas() {
     const clockRef = useRef(new THREE.Clock());
 
     const racersRef = useRef<RacerData[]>([]);
-    const trackRef = useRef<{ finishZ: number; animatedObjects: AnimatedObject[] } | null>(null);
+    const trackRef = useRef<{ finishZ: number; animatedObjects: AnimatedObject[]; rampPos: THREE.Vector3 } | null>(null);
     const frameIdRef = useRef<number>(0);
     const raceFinishedRef = useRef(false);
+    const clockStartedRef = useRef(false);
+    const cameraInitializedRef = useRef(false);
 
     const { racers, finishRace, state: gameState } = useGameStore();
 
@@ -89,6 +91,13 @@ export default function RaceCanvas() {
         groundMesh.position.y = -5;
         groundMesh.receiveShadow = true;
         scene.add(groundMesh);
+        
+        // Add a debug cube at origin to verify rendering
+        const debugGeo = new THREE.BoxGeometry(5, 5, 5);
+        const debugMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+        const debugCube = new THREE.Mesh(debugGeo, debugMat);
+        debugCube.position.set(0, 10, 20); // Near where racers should be
+        scene.add(debugCube);
 
         // Physics World
         const world = createPhysicsWorld();
@@ -127,6 +136,30 @@ export default function RaceCanvas() {
             };
         });
 
+        // Position camera to see all racers at the start
+        // Step physics once to get accurate initial positions
+        world.step(1/60);
+        if (racersRef.current.length > 0) {
+            // Find the racer furthest back (lowest Z) to frame all racers
+            let minZ = Infinity;
+            let maxZ = -Infinity;
+            let avgY = 0;
+            racersRef.current.forEach(racer => {
+                const pos = racer.headBody.position;
+                if (pos.z < minZ) minZ = pos.z;
+                if (pos.z > maxZ) maxZ = pos.z;
+                avgY += pos.y;
+            });
+            avgY /= racersRef.current.length;
+            
+            console.log('Initial positions - minZ:', minZ, 'maxZ:', maxZ, 'avgY:', avgY);
+            
+            // Position camera behind the pack looking at the front
+            camera.position.set(0, avgY + 15, minZ - 25);
+            camera.lookAt(0, avgY, maxZ);
+            console.log('Camera set to:', camera.position.x, camera.position.y, camera.position.z);
+        }
+
         raceFinishedRef.current = false;
     }, [racers]);
 
@@ -143,9 +176,34 @@ export default function RaceCanvas() {
         if (!world || !scene || !camera || !renderer || !controls || !track) return;
 
         const deltaTime = Math.min(clockRef.current.getDelta(), 0.05);
+        
+        // Skip first frame for physics (clock returns large delta on first call)
+        // But still update camera position and render!
+        const isFirstFrame = !clockStartedRef.current;
+        if (isFirstFrame) {
+            clockStartedRef.current = true;
+        }
 
-        // Step physics
-        world.step(1 / 60, deltaTime, 3);
+        // Step physics (skip on first frame or if deltaTime too small)
+        if (!isFirstFrame && deltaTime > 0.001) {
+            const fixedTimeStep = 1 / 60;
+            world.step(fixedTimeStep, deltaTime, 10);
+            
+            // Debug: confirm physics is stepping
+            if (Math.random() < 0.01) {
+                console.log('Physics stepped, deltaTime:', deltaTime.toFixed(4));
+            }
+        }
+        
+        // Debug: Log first racer position every 60 frames
+        if (racersRef.current.length > 0 && Math.random() < 0.02) {
+            const pos = racersRef.current[0].headBody.position;
+            const vel = racersRef.current[0].headBody.velocity;
+            console.log('Racer 0:', 
+                'pos:', pos.x.toFixed(2), pos.y.toFixed(2), pos.z.toFixed(2),
+                'vel:', vel.x.toFixed(2), vel.y.toFixed(2), vel.z.toFixed(2),
+                'Cam:', camera.position.z.toFixed(2));
+        }
 
         // Sync ragdolls
         syncRagdolls(racersRef.current);
@@ -166,13 +224,20 @@ export default function RaceCanvas() {
             }
         });
 
-        // Smooth camera follow
+        // Smooth camera follow - faster lerp to keep up with racers
         const targetCamPos = new THREE.Vector3(
             leaderPos.x * 0.3,
             leaderPos.y + 12,
             leaderPos.z - 20
         );
-        camera.position.lerp(targetCamPos, 0.05);
+        
+        // On first frame, instantly jump to position; after that use lerp
+        if (!cameraInitializedRef.current) {
+            camera.position.copy(targetCamPos);
+            cameraInitializedRef.current = true;
+        } else {
+            camera.position.lerp(targetCamPos, 0.15);
+        }
         camera.lookAt(leaderPos.x, leaderPos.y, leaderPos.z + 10);
 
         // Check for winner
