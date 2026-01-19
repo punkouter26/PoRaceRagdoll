@@ -1,0 +1,43 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch API",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-api",
+      "program": "${workspaceFolder}/src/PoRaceRagdoll.Api/bin/Debug/net10.0/PoRaceRagdoll.Api.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/PoRaceRagdoll.Api",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "http://localhost:3000%s"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    {
+      "name": "Launch Web (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/src/poraceragdoll-web"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack (API + Web)",
+      "configurations": ["Launch API"],
+      "preLaunchTask": "start-web",
+      "stopAll": true,
+      "presentation": {
+        "hidden": false,
+        "group": "PoRaceRagdoll",
+        "order": 1
+      }
+    }
+  ]
+}
